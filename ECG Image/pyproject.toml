@@ -1,14 +1,13 @@
 [tool.poetry]
 name = "cardiac-arrest"
 version = "0.1.0"
-description = "ECG classification app with Flask and FastAPI"
+description = "ECG classification app with Flask"
 authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.12"    # restrict to Python 3.11 for TensorFlow compatibility
 tensorflow = "2.13.0"
 flask = "2.3.3"
-uvicorn = "0.38.0"
 pillow = "11.0.0"
 python-multipart = "0.0.9"
 
