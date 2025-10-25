@@ -1,0 +1,1 @@
+export const DB_NAME = "Suprathon"; // Name of the MongoDB database
