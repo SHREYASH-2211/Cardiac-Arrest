@@ -4,3 +4,4 @@ wfdb
 numpy
 matplotlib
 scikit-learn
+flask-cors
