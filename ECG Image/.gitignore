@@ -44,6 +44,7 @@ Thumbs.db
 *.npy
 ECG_DATA/
 temp/
+tf-env/
 
 # Logs
 *.log
