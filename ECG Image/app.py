@@ -19,6 +19,10 @@ classes = [
     'Normal Person ECG Images (284x12=3408)'
 ]
 
+@app.route('/')
+def home():
+    return "Welcome to Heart Arrhythmia Prediction Backend! Use POST /predict with .dat and .hea files."
+
 # 🔹 API endpoint for prediction
 @app.route('/predict', methods=['POST'])
 def predict():
