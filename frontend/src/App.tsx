@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UserDashboard from "./pages/UserDashboard";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -20,8 +21,22 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login/:role" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/user-dashboard" element={<UserDashboard />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute requiredRole="doctor">
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/user-dashboard" 
+            element={
+              <ProtectedRoute requiredRole="user">
+                <UserDashboard />
+              </ProtectedRoute>
+            } 
+          />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

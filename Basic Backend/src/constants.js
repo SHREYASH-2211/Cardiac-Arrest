@@ -1,1 +1,1 @@
-export const DB_NAME = "Suprathon"; // Name of the MongoDB database
+export const DB_NAME = "CardiacArrest"; // Name of the MongoDB database

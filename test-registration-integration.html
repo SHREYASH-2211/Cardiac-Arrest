@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Registration Integration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        .form-group { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Registration Integration Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Backend Connection</h3>
+        <button onclick="testBackendConnection()">Test Backend</button>
+        <div id="backend-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test User Registration</h3>
+        <div class="form-group">
+            <input type="text" id="user-fullname" placeholder="Full Name" value="John Doe">
+            <input type="text" id="user-username" placeholder="Username" value="johndoe">
+            <input type="email" id="user-email" placeholder="Email" value="john@example.com">
+            <input type="password" id="user-password" placeholder="Password" value="password123">
+            <input type="number" id="user-age" placeholder="Age" value="30">
+            <select id="user-gender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+            </select>
+            <input type="tel" id="user-phone" placeholder="Phone" value="1234567890">
+        </div>
+        <button onclick="testUserRegistration()">Test User Registration</button>
+        <div id="user-registration-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Test Doctor Registration</h3>
+        <div class="form-group">
+            <input type="text" id="doctor-fullname" placeholder="Full Name" value="Dr. Jane Smith">
+            <input type="text" id="doctor-username" placeholder="Username" value="drjane">
+            <input type="email" id="doctor-email" placeholder="Email" value="jane@hospital.com">
+            <input type="password" id="doctor-password" placeholder="Password" value="password123">
+            <input type="text" id="doctor-specialization" placeholder="Specialization" value="Cardiology">
+            <input type="text" id="doctor-license" placeholder="License Number" value="DOC123456">
+            <input type="text" id="doctor-hospital" placeholder="Hospital" value="City Hospital">
+            <input type="tel" id="doctor-phone" placeholder="Phone" value="9876543210">
+        </div>
+        <button onclick="testDoctorRegistration()">Test Doctor Registration</button>
+        <div id="doctor-registration-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Test User Login</h3>
+        <div class="form-group">
+            <input type="email" id="login-user-email" placeholder="Email" value="john@example.com">
+            <input type="password" id="login-user-password" placeholder="Password" value="password123">
+        </div>
+        <button onclick="testUserLogin()">Test User Login</button>
+        <div id="user-login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>5. Test Doctor Login</h3>
+        <div class="form-group">
+            <input type="email" id="login-doctor-email" placeholder="Email" value="jane@hospital.com">
+            <input type="password" id="login-doctor-password" placeholder="Password" value="password123">
+        </div>
+        <button onclick="testDoctorLogin()">Test Doctor Login</button>
+        <div id="doctor-login-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+        async function testBackendConnection() {
+            const resultDiv = document.getElementById('backend-result');
+            try {
+                const response = await fetch(`${API_BASE_URL.replace('/api/v1', '')}/health`);
+                const data = await response.json();
+                resultDiv.innerHTML = `<div class="success">✅ Backend is running: ${data.message}</div>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Backend connection failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testUserRegistration() {
+            const resultDiv = document.getElementById('user-registration-result');
+            const userData = {
+                fullname: document.getElementById('user-fullname').value,
+                username: document.getElementById('user-username').value,
+                email: document.getElementById('user-email').value,
+                password: document.getElementById('user-password').value,
+                age: parseInt(document.getElementById('user-age').value),
+                gender: document.getElementById('user-gender').value,
+                phone: document.getElementById('user-phone').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ User registration successful: ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ User registration failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ User registration error: ${error.message}</div>`;
+            }
+        }
+
+        async function testDoctorRegistration() {
+            const resultDiv = document.getElementById('doctor-registration-result');
+            const doctorData = {
+                fullname: document.getElementById('doctor-fullname').value,
+                username: document.getElementById('doctor-username').value,
+                email: document.getElementById('doctor-email').value,
+                password: document.getElementById('doctor-password').value,
+                specialization: document.getElementById('doctor-specialization').value,
+                licenseNumber: document.getElementById('doctor-license').value,
+                hospital: document.getElementById('doctor-hospital').value,
+                phone: document.getElementById('doctor-phone').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/doctors/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(doctorData)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Doctor registration successful: ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Doctor registration failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Doctor registration error: ${error.message}</div>`;
+            }
+        }
+
+        async function testUserLogin() {
+            const resultDiv = document.getElementById('user-login-result');
+            const credentials = {
+                email: document.getElementById('login-user-email').value,
+                password: document.getElementById('login-user-password').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ User login successful: ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ User login failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ User login error: ${error.message}</div>`;
+            }
+        }
+
+        async function testDoctorLogin() {
+            const resultDiv = document.getElementById('doctor-login-result');
+            const credentials = {
+                email: document.getElementById('login-doctor-email').value,
+                password: document.getElementById('login-doctor-password').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/doctors/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Doctor login successful: ${data.message}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Doctor login failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Doctor login error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-test backend connection on load
+        window.onload = testBackendConnection;
+    </script>
+</body>
+</html>

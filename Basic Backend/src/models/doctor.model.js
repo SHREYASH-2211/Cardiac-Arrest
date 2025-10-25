@@ -35,18 +35,17 @@ const doctorSchema = new mongoose.Schema({
   },
   licenseNumber: {
     type: String,
-    required: true,
-    unique: true,
+    
     trim: true
   },
   hospital: {
     type: String,
-    required: true,
+    
     trim: true
   },
   phone: {
     type: String,
-    required: true,
+    
     trim: true
   },
   avatar: {
