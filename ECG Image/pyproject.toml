@@ -7,14 +7,10 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.11"
 tensorflow = "2.13.0"
-fastapi = "0.120.0"
-uvicorn = "0.38.0"
 numpy = ">=2.1.0"
 pillow = "11.0.0"
 python-multipart = "0.0.9"
-protobuf = ">=5.28.0"
-pydantic = "2.9.2"
-pydantic-core = "2.23.4"
+
 
 
 [build-system]
