@@ -63,7 +63,7 @@ const UploadSection = () => {
         formData.append("dat", ecgDatFile);
         formData.append("hea", ecgHeaFile);
 
-        const response = await fetch("http://127.0.0.1:5000/predict/arrythmia", {
+        const response = await fetch("https://cardiac-arrest-ojj9.onrender.com/predict/arrythmia", {
           method: "POST",
           body: formData,
         });
