@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
+from flask_cors import CORS  # 👈 added
 import numpy as np
 import os
 
 # 🔹 Initialize Flask app
 app = Flask(__name__)
+
+# 🔹 Enable CORS only for your frontend
+CORS(app, origins=["http://localhost:8080"])  # 👈 important
 
 # 🔹 Load your trained model once when the server starts
 model_path = 'ecg_image.h5'  # Replace with your actual model path
@@ -21,7 +25,7 @@ classes = [
 
 @app.route('/')
 def home():
-    return "Welcome to Heart Arrhythmia Prediction Backend! Use POST /predict with .dat and .hea files."
+    return "Welcome to ECG Image Classification Backend! Use POST /predict with an ECG image file."
 
 # 🔹 API endpoint for prediction
 @app.route('/predict', methods=['POST'])
@@ -41,10 +45,10 @@ def predict():
         file.save(file_path)
 
         # 🔹 Load and preprocess the image
-        img = image.load_img(file_path, target_size=(224, 224))  # Use your model's input size
+        img = image.load_img(file_path, target_size=(224, 224))  # Adjust if model input differs
         img_array = image.img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
-        img_array = img_array / 255.0  # Same preprocessing as training
+        img_array = img_array / 255.0  # same normalization as during training
 
         # 🔹 Predict
         predictions = model.predict(img_array)
