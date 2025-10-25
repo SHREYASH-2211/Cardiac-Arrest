@@ -1,22 +1,23 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 import tempfile
 import numpy as np
-from flask import Flask, request, jsonify
 from tensorflow.keras.models import load_model
 import wfdb
 
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:8080"])  # 👈 allow only frontend
 
 # Load model once at startup
 model = load_model('arrhythmia_cnn.h5')
 print("✅ Model loaded!")
 
-# 👇 Add this new route for the home page
 @app.route('/')
 def home():
-    return "Welcome to Heart Arrhythmia Prediction Backend! Use POST /predict with .dat and .hea files."
+    return "Welcome to Heart Arrhythmia Prediction Backend! Use POST /predict/arrythmia with .dat and .hea files."
 
-@app.route('/predict/arrythmia/', methods=['POST'])
+@app.route('/predict/arrythmia', methods=['POST'])
 def predict():
     try:
         if 'dat' not in request.files or 'hea' not in request.files:
