@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import PredictionResults from "./PredictionResults";
+import { multiparameterApiService, VitalsInput, PredictionResponse } from "@/lib/multiparameter-api";
 
 const UploadSection = () => {
   const { toast } = useToast();
@@ -33,6 +34,16 @@ const UploadSection = () => {
   const [showResults, setShowResults] = useState(false);
   const [predictionData, setPredictionData] = useState<any>(null);
   const [isPredicting, setIsPredicting] = useState(false);
+  const [patientId, setPatientId] = useState<string>("Patient_001");
+  const [multiparameterResults, setMultiparameterResults] = useState<{
+    predictions: PredictionResponse[];
+    summary: {
+      total_rows: number;
+      predictions_made: number;
+      average_risk: number;
+      high_risk_count: number;
+    };
+  } | null>(null);
 
   // Files
   const [ecgDatFile, setEcgDatFile] = useState<File | null>(null);
@@ -58,6 +69,40 @@ const UploadSection = () => {
   };
 
   const handlePredict = async () => {
+    // 🔹 Multi-Parameter Vitals Prediction
+    if (vitalsFile) {
+      setIsPredicting(true);
+      try {
+        // Read CSV file
+        const csvText = await vitalsFile.text();
+        
+        // Process CSV data with multiparameter API
+        const results = await multiparameterApiService.processCsvData(csvText, patientId);
+        
+        setMultiparameterResults(results);
+        setPredictionData({
+          type: "multiparameter",
+          results: results,
+        });
+
+        setShowResults(true);
+        toast({ 
+          title: "Multi-Parameter Analysis Complete",
+          description: `Processed ${results.summary.predictions_made} predictions with ${results.summary.average_risk.toFixed(2)}% average risk`
+        });
+      } catch (error) {
+        console.error("Multi-parameter prediction error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to process multi-parameter vitals data",
+          variant: "destructive",
+        });
+      } finally {
+        setIsPredicting(false);
+      }
+      return;
+    }
+
     // 🔹 ECG Signal Prediction
     if (ecgDatFile && ecgHeaFile) {
       setIsPredicting(true);
@@ -136,7 +181,7 @@ const UploadSection = () => {
 
     toast({
       title: "No valid files",
-      description: "Please upload ECG Signal (.dat + .hea) or ECG Image (.jpg/.png)",
+      description: "Please upload ECG Signal (.dat + .hea), ECG Image (.jpg/.png), or Vitals CSV",
       variant: "destructive",
     });
   };
@@ -154,6 +199,8 @@ const UploadSection = () => {
             <CardDescription>
               {predictionData.type === "ecg-image"
                 ? "AI ECG Image Analysis"
+                : predictionData.type === "multiparameter"
+                ? "AI Multi-Parameter Vitals Analysis"
                 : "AI ECG Signal Risk Score"}
             </CardDescription>
           </CardHeader>
@@ -181,6 +228,70 @@ const UploadSection = () => {
                   </p>
                 </div>
                 <p className="text-muted-foreground">{predictionData.message}</p>
+              </>
+            )}
+            {predictionData.type === "multiparameter" && (
+              <>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="text-sm text-blue-600 font-medium">Total Rows</p>
+                      <p className="text-2xl font-bold text-blue-800">
+                        {predictionData.results.summary.total_rows}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="text-sm text-green-600 font-medium">Predictions Made</p>
+                      <p className="text-2xl font-bold text-green-800">
+                        {predictionData.results.summary.predictions_made}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-lg">
+                      <p className="text-sm text-orange-600 font-medium">Average Risk</p>
+                      <p className="text-2xl font-bold text-orange-800">
+                        {(predictionData.results.summary.average_risk * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded-lg">
+                      <p className="text-sm text-red-600 font-medium">High Risk Alerts</p>
+                      <p className="text-2xl font-bold text-red-800">
+                        {predictionData.results.summary.high_risk_count}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {predictionData.results.summary.high_risk_count > 0 && (
+                    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="text-red-500 h-5 w-5" />
+                        <p className="text-red-800 font-semibold">
+                          🚨 {predictionData.results.summary.high_risk_count} High Risk Predictions Detected!
+                        </p>
+                      </div>
+                      <p className="text-red-600 text-sm mt-1">
+                        Immediate medical attention may be required for this patient.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-semibold mb-2">Recent Predictions</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {predictionData.results.predictions.slice(-5).map((pred: PredictionResponse, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-sm">
+                          <span>{new Date(pred.timestamp).toLocaleTimeString()}</span>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            pred.predicted_class === 1 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {(pred.risk_probability * 100).toFixed(1)}% Risk
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
@@ -272,16 +383,28 @@ const UploadSection = () => {
           <Card>
             <CardHeader>
               <CardTitle>Multi-Parameter Vitals</CardTitle>
-              <CardDescription>Upload CSV file with patient vitals</CardDescription>
+              <CardDescription>Upload CSV file with patient vitals for real-time cardiac arrest prediction</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-muted p-4 rounded-lg text-xs text-muted-foreground">
-                Required columns: Patient_ID, HR, SpO₂, BP, QTc, etc.
+                <strong>Required columns:</strong> Patient_ID, time, HR [bpm], SpO2 [%], NBPs [mmHg], NBPd [mmHg], NBPm [mmHg], RR [rpm], QTc [msec], DeltaQTc [msec], QT [msec], QT-HR [bpm], ST-III [mm], ST-V [mm], PVC [/min], Perf [NU], Pulse (NBP) [bpm], Pulse (SpO2) [bpm], btbHR [bpm]
               </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="patient-id">Patient ID</Label>
+                <Input
+                  id="patient-id"
+                  type="text"
+                  placeholder="Patient_001"
+                  value={patientId}
+                  onChange={(e) => setPatientId(e.target.value)}
+                />
+              </div>
+
               <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors">
                 <LineChart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <Label htmlFor="vitals" className="cursor-pointer">
-                  <span className="text-sm text-muted-foreground">Upload CSV file</span>
+                  <span className="text-sm text-muted-foreground">Upload CSV file with vitals data</span>
                   <Input id="vitals" type="file" accept=".csv" className="hidden" onChange={(e) => handleFileUpload("vitals", e)} />
                 </Label>
               </div>

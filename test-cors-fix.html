@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test CORS Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test CORS Fix for Multi-Parameter API</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Health Check</h3>
+        <button onclick="testHealthCheck()">Test Health Check</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test Prediction (CORS)</h3>
+        <button onclick="testPrediction()">Test Prediction</button>
+        <div id="prediction-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8001';
+
+        async function testHealthCheck() {
+            const resultDiv = document.getElementById('health-result');
+            try {
+                const response = await fetch(`${API_BASE_URL}/`);
+                const data = await response.json();
+                resultDiv.innerHTML = `<div class="success">✅ Health check successful: ${data.status}</div>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Health check failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testPrediction() {
+            const resultDiv = document.getElementById('prediction-result');
+            const sampleVitals = {
+                'DeltaQTc [msec]': 15.2,
+                'HR [bpm]': 85,
+                'NBPd [mmHg]': 70,
+                'NBPm [mmHg]': 85,
+                'NBPs [mmHg]': 100,
+                'PVC [/min]': 2.1,
+                'Perf [NU]': 0.8,
+                'Pulse (NBP) [bpm]': 85,
+                'Pulse (SpO2) [bpm]': 85,
+                'QT [msec]': 380,
+                'QT-HR [bpm]': 85,
+                'QTc [msec]': 420,
+                'RR [rpm]': 16,
+                'ST-III [mm]': 0.1,
+                'ST-V [mm]': 0.2,
+                'SpO2 [%]': 98,
+                'btbHR [bpm]': 85,
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict/Patient_001`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(sampleVitals)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `<div class="success">✅ Prediction successful: Risk = ${(data.risk_probability * 100).toFixed(2)}%</div>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Prediction failed: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-test health check on load
+        window.onload = testHealthCheck;
+    </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import joblib
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Dict, Any, List
@@ -35,7 +36,7 @@ class VitalsInput(BaseModel):
 
     class Config:
         # This allows you to send JSON with the 'dirty' names too
-        allow_population_by_field_name = True
+        populate_by_name = True
 
 # This model defines the *output* your API will send back.
 class PredictionResponse(BaseModel):
@@ -71,6 +72,15 @@ app = FastAPI(
     title="Cardiac Arrest Prediction API",
     description="A real-time API to predict cardiac arrest risk from time-series vital signs.",
     version="1.0.0"
+)
+
+# --- CORS Configuration ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],  # Frontend URLs
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # --- Startup Event: Load Models ---
@@ -176,3 +186,8 @@ async def predict_risk(patient_id: str, vitals: VitalsInput):
 @app.get("/")
 def read_root():
     return {"status": "Cardiac Arrest Prediction API is running"}
+
+# --- OPTIONS endpoint for CORS preflight ---
+@app.options("/predict/{patient_id}")
+async def options_predict(patient_id: str):
+    return {"message": "OK"}
