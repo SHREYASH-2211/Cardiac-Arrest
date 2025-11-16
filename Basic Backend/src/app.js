@@ -17,10 +17,12 @@ app.use(cookieParser());
 // Import routes
 import userRouter from "./routes/user.routes.js";
 import doctorRouter from "./routes/doctor.routes.js";
+import predictionRoutes from "./routes/predictionRoutes.js";
 
 // Routes declaration
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/doctors", doctorRouter);
+app.use("/api/predictions", predictionRoutes);
 
 // Health check route
 app.get("/health", (req, res) => {
