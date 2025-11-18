@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Watch, FileText, BookOpen, LogOut, Bell, Heart } from "lucide-react";
+import { Activity, Watch, FileText, BookOpen, LogOut, Bell, Heart, LineChart, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser, logout } from "@/lib/auth";
@@ -8,12 +8,31 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { multiparameterApiService, PredictionResponse } from "@/lib/multiparameter-api";
 
 const UserDashboard = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const user = getCurrentUser();
   const [watchConnected, setWatchConnected] = useState(false);
-  const [activeSection, setActiveSection] = useState<'overview' | 'reports' | 'education'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'reports' | 'education' | 'multiparameter'>('overview');
+
+  // Multiparameter state
+  const [vitalsFile, setVitalsFile] = useState<File | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [multiparameterResults, setMultiparameterResults] = useState<{
+    predictions: PredictionResponse[];
+    summary: {
+      total_rows: number;
+      predictions_made: number;
+      average_risk: number;
+      high_risk_count: number;
+    };
+  } | null>(null);
+  const [showResults, setShowResults] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -26,6 +45,154 @@ const UserDashboard = () => {
 
   const currentRisk = 0.34;
   const isHighRisk = currentRisk > 0.6;
+
+  // Multiparameter functions
+  const API_BASE = "http://localhost:8000/api/predictions";
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload a CSV file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setVitalsFile(file);
+    toast({
+      title: "File Uploaded",
+      description: `${file.name} uploaded successfully`,
+    });
+  };
+
+  const normalizePercent = (value: any) => {
+    if (value === null || value === undefined) return null;
+    const n = Number(value);
+    if (Number.isNaN(n)) return null;
+    return n <= 1 ? n * 100 : n;
+  };
+
+  const computeRecentOrAverageRisk = (results: any): number | null => {
+    if (!results) return null;
+
+    const preds: any[] = Array.isArray(results.predictions) ? results.predictions : [];
+
+    if (preds.length > 0) {
+      const last = preds[preds.length - 1];
+      const candidate = last?.risk_probability ?? last?.prob ?? last?.probability ?? last?.risk_score ?? last?.risk ?? last?.score ?? last?.value;
+      const recent = normalizePercent(candidate);
+      if (recent !== null) return Math.min(Math.max(recent, 0), 100);
+    }
+
+    const values: number[] = [];
+    for (const p of preds) {
+      const v = p?.risk_probability ?? p?.prob ?? p?.probability ?? p?.risk_score ?? p?.risk ?? p?.score ?? p?.value;
+      const n = normalizePercent(v);
+      if (n !== null && !Number.isNaN(n)) values.push(n);
+    }
+
+    if (values.length > 0) {
+      const sum = values.reduce((a, b) => a + b, 0);
+      const avg = sum / values.length;
+      return Math.min(Math.max(avg, 0), 100);
+    }
+
+    const summaryAvg = normalizePercent(results?.summary?.average_risk ?? null);
+    if (summaryAvg !== null) return Math.min(Math.max(summaryAvg, 0), 100);
+
+    return null;
+  };
+
+  const safeSave = async (path: string, body: any) => {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text().catch(() => "");
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
+
+      if (!res.ok) {
+        console.warn("[safeSave] backend returned error", res.status, data);
+        toast({
+          title: "Save failed",
+          description: `Backend ${res.status}: ${typeof data === "string" ? data : data?.error || "See console"}`,
+          variant: "destructive",
+        });
+        return { ok: false, status: res.status, response: data };
+      }
+
+      toast({ title: "Stored", description: "Result saved to backend" });
+      return { ok: true, status: res.status, response: data };
+    } catch (err: any) {
+      console.error("[safeSave] network error", err);
+      toast({
+        title: "Save failed",
+        description: `Network error while saving result: ${err?.message || err}`,
+        variant: "destructive",
+      });
+      return { ok: false, error: err };
+    }
+  };
+
+  const handleMultiparameterPredict = async () => {
+    if (!vitalsFile) {
+      toast({
+        title: "No file selected",
+        description: "Please upload a CSV file first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPredicting(true);
+    try {
+      const csvText = await vitalsFile.text();
+      const results = await multiparameterApiService.processCsvData(csvText, user?.id || 'unknown');
+
+      const computedRisk = computeRecentOrAverageRisk(results);
+      if (!results.summary) results.summary = {};
+      results.summary.average_risk = computedRisk;
+
+      setMultiparameterResults(results);
+      setShowResults(true);
+
+      const averageRisk = computedRisk;
+
+      await safeSave("/vitals", {
+        patientId: user?.id || 'unknown',
+        averageRisk,
+        summary: results.summary || {},
+        rawResult: results || {},
+        metadata: { source: "user-dashboard-multiparameter" },
+      });
+
+      toast({
+        title: "Multi-Parameter Analysis Complete",
+        description: `Processed ${results?.summary?.predictions_made ?? "N/A"} rows — average risk: ${averageRisk !== null ? averageRisk.toFixed(2) + "%" : "N/A"}`,
+      });
+    } catch (err) {
+      console.error("Multi-parameter prediction error:", err);
+      toast({
+        title: "Error",
+        description: "Failed to process multi-parameter vitals data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPredicting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/30">
@@ -87,6 +254,17 @@ const UserDashboard = () => {
             >
               <BookOpen className="h-4 w-4 inline-block mr-2" />
               Heart Health Education
+            </button>
+            <button
+              onClick={() => setActiveSection('multiparameter')}
+              className={`px-6 py-4 font-medium transition-colors border-b-2 ${
+                activeSection === 'multiparameter'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <LineChart className="h-4 w-4 inline-block mr-2" />
+              Risk Analysis
             </button>
           </div>
         </div>
@@ -391,6 +569,133 @@ const UserDashboard = () => {
                 })}
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {activeSection === 'multiparameter' && (
+          <div className="space-y-6 animate-fade-in">
+            {showResults && multiparameterResults ? (
+              <div className="space-y-6">
+                <Button variant="outline" onClick={() => setShowResults(false)}>
+                  ← Back to Upload
+                </Button>
+                <Card className="border-primary shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Multi-Parameter Analysis Results</CardTitle>
+                    <CardDescription>
+                      AI analysis of your vital signs data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <p className="text-sm text-blue-600 font-medium">Total Rows</p>
+                          <p className="text-2xl font-bold text-blue-800">{multiparameterResults?.summary?.total_rows}</p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <p className="text-sm text-green-600 font-medium">Predictions Made</p>
+                          <p className="text-2xl font-bold text-green-800">{multiparameterResults?.summary?.predictions_made}</p>
+                        </div>
+                        <div className="bg-orange-50 p-3 rounded-lg">
+                          <p className="text-sm text-orange-600 font-medium">Average Risk</p>
+                          <p className="text-2xl font-bold text-orange-800">
+                            {(() => {
+                              const avg = multiparameterResults?.summary?.average_risk;
+                              const n = normalizePercent(avg);
+                              return n !== null ? `${n.toFixed(1)}%` : "N/A";
+                            })()}
+                          </p>
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-lg">
+                          <p className="text-sm text-red-600 font-medium">High Risk Alerts</p>
+                          <p className="text-2xl font-bold text-red-800">{multiparameterResults?.summary?.high_risk_count ?? 0}</p>
+                        </div>
+                      </div>
+
+                      {multiparameterResults?.summary?.high_risk_count > 0 && (
+                        <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="text-red-500 h-5 w-5" />
+                            <p className="text-red-800 font-semibold">
+                              🚨 {multiparameterResults.summary.high_risk_count} High Risk Predictions Detected!
+                            </p>
+                          </div>
+                          <p className="text-red-600 text-sm mt-1">Immediate medical attention may be required.</p>
+                        </div>
+                      )}
+
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-semibold mb-2">Recent Predictions</h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {Array.isArray(multiparameterResults?.predictions) &&
+                            multiparameterResults.predictions.slice(-5).map((pred: PredictionResponse, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center text-sm">
+                                <span>{new Date(pred.timestamp).toLocaleTimeString()}</span>
+                                <span className={`px-2 py-1 rounded text-xs ${pred.predicted_class === 1 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                  {(pred.risk_probability * 100).toFixed(1)}% Risk
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <LineChart className="h-6 w-6 text-primary" />
+                    Multi-Parameter Risk Analysis
+                  </CardTitle>
+                  <CardDescription>
+                    Upload your vital signs CSV file for AI-powered cardiac arrest risk prediction
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
+                    <strong>Required columns:</strong> Patient_ID, time, HR [bpm], SpO2 [%], NBPs [mmHg], NBPd [mmHg], NBPm [mmHg], RR [rpm], QTc [msec], DeltaQTc [msec], QT [msec], QT-HR [bpm], ST-III [mm], ST-V [mm], PVC [/min], Perf [NU], Pulse (NBP) [bpm], Pulse (SpO2) [bpm], btbHR [bpm]
+                  </div>
+
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors">
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <Label htmlFor="vitals-csv" className="cursor-pointer">
+                      <span className="text-sm text-muted-foreground">Click to upload or drag and drop CSV file</span>
+                      <Input 
+                        id="vitals-csv" 
+                        type="file" 
+                        accept=".csv" 
+                        className="hidden" 
+                        onChange={handleFileUpload} 
+                      />
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-2">Supports .csv files only</p>
+                  </div>
+
+                  {vitalsFile && (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span className="text-sm font-medium">{vitalsFile.name} uploaded ✅</span>
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handleMultiparameterPredict} 
+                    size="lg" 
+                    className="w-full" 
+                    disabled={isPredicting || !vitalsFile}
+                  >
+                    {isPredicting ? "Analyzing Your Data..." : "Generate AI Risk Analysis"}
+                  </Button>
+
+                  <div className="text-center text-xs text-muted-foreground">
+                    Your data will be securely processed and stored for future reference
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </main>
